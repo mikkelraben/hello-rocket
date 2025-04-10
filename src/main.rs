@@ -3,12 +3,13 @@ extern crate rocket;
 
 use rocket::serde::{json::Json, Deserialize};
 
-#[get("/")]
-fn index() -> &'static str {
-    println!("Request received");
+use mongodb::{
+    bson::{doc, Document},
+    Client, Collection,
+};
 
-    "Hello, world!"
-}
+const client_uri: &str = "mongodb://username:password@localhost:27017/";
+let users_collection: Collection<Document>
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
@@ -20,13 +21,24 @@ struct Thing<'r> {
 
 #[post("/", data = "<thing>")]
 fn post_index(thing: Json<Thing<'_>>) -> () {
-    println!("POST request received");
-    println!("device_id: {}", thing.device_id);
-    println!("device_type: {}", thing.device_type);
-    println!("measurement: {}", thing.measurement);
+    users_collection.
+        insert_one(
+            doc! {
+                "device_id": thing.device_id,
+                "device_type": thing.device_type,
+                "measurement": thing.measurement,
+            },
+            None,
+        )
+        .expect("Failed to insert document");
 }
 
 #[launch]
 fn rocket() -> _ {
+    let client = Client::with_uri_str(client_uri);
+
+    let database = client.database("Lightguide");
+    users_collection = database.collection("Users");
+
     rocket::build().mount("/", routes![index, post_index])
 }
